@@ -1,34 +1,52 @@
-import logging
 from aiogram import Bot, Dispatcher, executor, types
 import os
 
-# تفعيل اللوجات (مفيدة لو حصلت أخطاء)
-logging.basicConfig(level=logging.INFO)
+API_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))  # ضع chat_id الخاص بك في Secrets
 
-# توكن البوت (حطه من متغير البيئة أو اكتبه مباشرة)
-API_TOKEN = os.getenv("BOT_TOKEN")  # تأكد أنك ضايف BOT_TOKEN في Secrets
-
-# إنشاء البوت والديسباتشر
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
+# لتخزين الرسائل مؤقتًا
+user_messages = {}
 
-# أمر /start
-@dp.message_handler(commands=['start'])
-async def send_welcome(message: types.Message):
-    await message.reply("حياك الله 🤝، معك بوت الحجز الخاص بالملعب!")
-
-
-# أمر /help
-@dp.message_handler(commands=['help'])
-async def send_help(message: types.Message):
-    await message.reply("الأوامر المتاحة:\n/start - ترحيب\n/help - المساعدة")
-
-
-# أي رسالة ثانية
+# استقبال أي رسالة من أي شخص
 @dp.message_handler()
-async def echo_message(message: types.Message):
-    await message.reply("تم استلام رسالتك ✅")
+async def forward_to_admin(message: types.Message):
+    user_id = message.from_user.id
+    username = message.from_user.username or "غير معروف"
+
+    # حفظ الرسالة
+    user_messages[message.message_id] = user_id
+
+    # إعادة توجيه الرسالة إليك
+    text = f"رسالة جديدة من @{username} (ID:{user_id}):\n{message.text}\n\nللرد استخدم:\n/reply {message.message_id} نص الرد"
+    await bot.send_message(chat_id=ADMIN_CHAT_ID, text=text)
+
+    # رسالة شكر للمرسل
+    await message.reply("شكرًا لملاحظتك! سيتم مراجعتها من قبل الإدارة ✅")
+
+
+# أمر للرد على الرسائل مباشرة
+@dp.message_handler(commands=['reply'])
+async def reply_to_user(message: types.Message):
+    try:
+        args = message.text.split(maxsplit=2)
+        if len(args) < 3:
+            await message.reply("صيغة الأمر خاطئة! استخدم:\n/reply message_id نص الرد")
+            return
+
+        msg_id = int(args[1])
+        reply_text = args[2]
+
+        if msg_id in user_messages:
+            user_id = user_messages[msg_id]
+            await bot.send_message(chat_id=user_id, text=reply_text)
+            await message.reply("تم إرسال الرد ✅")
+        else:
+            await message.reply("لم أجد رسالة بهذا الرقم.")
+    except Exception as e:
+        await message.reply(f"حدث خطأ: {e}")
 
 
 if __name__ == '__main__':
