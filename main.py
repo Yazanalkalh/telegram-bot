@@ -1,90 +1,35 @@
+import logging
+from aiogram import Bot, Dispatcher, executor, types
 import os
-import openai
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-from dotenv import load_dotenv
 
-# تحميل القيم من ملف التكوين
-load_dotenv("config.env")
-TOKEN = os.environ.get("TOKEN")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
-DEFAULT_REPLY = os.environ.get("DEFAULT_REPLY", "شكرًا على رسالتك! سنتواصل معك قريبًا.")
+# تفعيل اللوجات (مفيدة لو حصلت أخطاء)
+logging.basicConfig(level=logging.INFO)
 
-# تفعيل OpenAI
-openai.api_key = OPENAI_API_KEY
+# توكن البوت (حطه من متغير البيئة أو اكتبه مباشرة)
+API_TOKEN = os.getenv("BOT_TOKEN")  # تأكد أنك ضايف BOT_TOKEN في Secrets
 
-# رسالة ترحيبية
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text("أهلًا! يمكنك مراسلتي، وسأرد عليك باستخدام الذكاء الاصطناعي.")
+# إنشاء البوت والديسباتشر
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
 
-# الردود باستخدام ChatGPT
-def ai_reply(update: Update, context: CallbackContext):
-    user_msg = update.message.text
-    try:
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=user_msg,
-            max_tokens=150
-        )
-        reply = response.choices[0].text.strip()
-    except Exception as e:
-        reply = DEFAULT_REPLY
-        print(e)
-    
-    update.message.reply_text(reply)
 
-# --- لوحة التحكم --- #
+# أمر /start
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    await message.reply("حياك الله 🤝، معك بوت الحجز الخاص بالملعب!")
 
-# تحديث الرد الافتراضي
-def set_default_reply(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    if user_id != ADMIN_ID:
-        update.message.reply_text("آسف، هذا الأمر لك فقط.")
-        return
 
-    new_reply = " ".join(context.args)
-    if not new_reply:
-        update.message.reply_text("اكتب الرد الجديد بعد الأمر.")
-        return
+# أمر /help
+@dp.message_handler(commands=['help'])
+async def send_help(message: types.Message):
+    await message.reply("الأوامر المتاحة:\n/start - ترحيب\n/help - المساعدة")
 
-    global DEFAULT_REPLY
-    DEFAULT_REPLY = new_reply
-    update.message.reply_text(f"تم تحديث الرد الافتراضي إلى: {DEFAULT_REPLY}")
 
-# إعادة تشغيل البوت
-def restart_bot(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    if user_id != ADMIN_ID:
-        update.message.reply_text("آسف، هذا الأمر لك فقط.")
-        return
-    update.message.reply_text("جارٍ إعادة تشغيل البوت...")
-    os._exit(0)
+# أي رسالة ثانية
+@dp.message_handler()
+async def echo_message(message: types.Message):
+    await message.reply("تم استلام رسالتك ✅")
 
-# أمر للتأكد من صلاحيات الإدارة
-def admin_command(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    if user_id == ADMIN_ID:
-        update.message.reply_text("أنت المشرف! الأمر نفذ بنجاح.")
-    else:
-        update.message.reply_text("آسف، هذا الأمر لك فقط.")
 
-# --- نهاية لوحة التحكم --- #
-
-def main():
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
-
-    # أوامر البوت
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_reply))
-    dp.add_handler(CommandHandler("setreply", set_default_reply))
-    dp.add_handler(CommandHandler("restart", restart_bot))
-    dp.add_handler(CommandHandler("admin", admin_command))
-
-    updater.start_polling()
-    print("Bot started with ChatGPT and Admin Panel...")
-    updater.idle()
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)
