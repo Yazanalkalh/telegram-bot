@@ -61,7 +61,7 @@ def restart_bot(update: Update, context: CallbackContext):
     update.message.reply_text("جارٍ إعادة تشغيل البوت...")
     os._exit(0)
 
-# مثال أمر آخر للإدارة (اختياري)
+# أمر للتأكد من صلاحيات الإدارة
 def admin_command(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     if user_id == ADMIN_ID:
@@ -75,6 +75,7 @@ def main():
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
 
+    # أوامر البوت
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_reply))
     dp.add_handler(CommandHandler("setreply", set_default_reply))
